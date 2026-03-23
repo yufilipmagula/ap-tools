@@ -4,56 +4,68 @@
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+GREEN='\033[0;32m'
 NC='\033[0m'
 
-# 1. Extract L4T Release & Revision
+# 1. System Versions & Board ID
+L4T_REL="N/A"
+BOARD_ID="N/A"
 if [ -f /etc/nv_tegra_release ]; then
     L4T_RAW=$(head -n 1 /etc/nv_tegra_release)
-    # Using sed to pull "R35 REV 4.1"
     L4T_REL=$(echo "$L4T_RAW" | sed -E 's/.*(R[0-9]+) \(release\), REVISION: ([0-9.]+).*/\1 REV \2/')
-else
-    L4T_REL="Not Found"
+    BOARD_ID=$(echo "$L4T_RAW" | grep -o "BOARD: [^,]*" | cut -d ' ' -f2)
 fi
 
-# 2. Extract JetPack Version
-JP_VER=$(apt-cache show nvidia-l4t-core 2>/dev/null | grep Version | head -n 1 | awk '{print $2}' || echo "N/A")
+# 2. Bootloader & Power Mode
+BL_VER=$(sudo nvbootctrl dump-slots-info 2>/dev/null | grep "Current version" | cut -d ':' -f2 | xargs || echo "N/A")
+PWR_MODE=$(nvpmodel -q 2>/dev/null | grep "NV Power Mode" | cut -d ':' -f2 | xargs || echo "N/A")
 
-# 3. Extract Bootloader Info
-BL_INFO=$(sudo nvbootctrl dump-slots-info 2>/dev/null)
-BL_VER=$(echo "$BL_INFO" | grep "Current version" | cut -d ':' -f2 | xargs || echo "N/A")
-BL_SLOT=$(echo "$BL_INFO" | grep "Active bootloader slot" | cut -d ':' -f2 | xargs || echo "N/A")
+# 3. Device Model & Connectivity
+MODEL=$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0')
+ping -c 1 8.8.8.8 >/dev/null 2>&1
+[ $? -eq 0 ] && NET_STATUS="${GREEN}ONLINE${NC}" || NET_STATUS="${RED}OFFLINE${NC}"
 
-# 4. Kernel
-KERNEL=$(uname -r)
+# 4. A/B Slot & Docker Status
+ACTIVE_SLOT=$(sudo nvbootctrl dump-slots-info 2>/dev/null | grep "Active bootloader slot" | cut -d ':' -f2 | xargs)
+SLOT_CONFIRM=$(sudo nvbootctrl dump-slots-info 2>/dev/null | grep -A 3 "slot: 0" | grep "status" | awk '{print $2}' | tr -d ',')
 
-# 5. Storage Logic (Fixed the quote here)
+DOCKER_COUNT=$(docker ps -q 2>/dev/null | wc -l)
+[ "$DOCKER_COUNT" -gt 0 ] && DOCKER_STATUS="${RED}$DOCKER_COUNT Running${NC}" || DOCKER_STATUS="${GREEN}None${NC}"
+
+# 5. Storage Logic
 STORAGE_INFO=$(df -h / | tail -1)
 DISK_USAGE_PCT=$(echo "$STORAGE_INFO" | awk '{print $5}' | sed 's/%//')
 DISK_FREE=$(echo "$STORAGE_INFO" | awk '{print $4}')
+[ "$DISK_USAGE_PCT" -gt 85 ] && STORAGE_VAL="${RED}${DISK_USAGE_PCT}% / ${DISK_FREE}${NC}" || STORAGE_VAL="${DISK_USAGE_PCT}% / ${DISK_FREE}"
 
-# Color storage red if usage is > 90%
-if [ "$DISK_USAGE_PCT" -gt 90 ]; then
-    STORAGE_VAL="${RED}${DISK_USAGE_PCT}% / ${DISK_FREE}${NC}"
-else
-    STORAGE_VAL="${DISK_USAGE_PCT}% / ${DISK_FREE}"
-fi
-
-# 6. BIOS and Chip SKU
-CHIP_SKU=$(sudo hexdump -s 16 -n 4 -e '1/4 "%08x"' /sys/bus/nvmem/devices/fuse/nvmem 2>/dev/null || echo "N/A")
-BIOS_VER=$(cat /sys/class/dmi/id/bios_version 2>/dev/null | xargs || echo "N/A")
+# 6. Hardware IDs
+CHIP_SKU=$(sudo hexdump -s 16 -n 4 -e '1/4 "%08x"' /sys/bus/nvmem/devices/fuse/nvmem 2>/dev/null)
+BIOS_VER=$(cat /sys/class/dmi/id/bios_version 2>/dev/null | xargs)
 
 # --- BUILD THE TABLE ---
+echo -e "\n${CYAN}========================================================${NC}"
+echo -e "${YELLOW}           PRE-OTA DEVICE READINESS REPORT               ${NC}"
 echo -e "${CYAN}========================================================${NC}"
-echo -e "${YELLOW}           JETSON SYSTEM INFORMATION BASELINE           ${NC}"
-echo -e "${CYAN}========================================================${NC}"
-printf "| %-22s | %-27s |\n" "Component" "Value"
+printf "| %-22s | %-27b |\n" "Component" "Value"
 echo -e "${CYAN}--------------------------------------------------------${NC}"
+printf "| %-22s | %-27b |\n" "Device Model" "$MODEL"
+printf "| %-22s | %-27b |\n" "Board ID" "$BOARD_ID"
 printf "| %-22s | %-27b |\n" "L4T Release" "$L4T_REL"
-printf "| %-22s | %-27b |\n" "JetPack Version" "$JP_VER"
 printf "| %-22s | %-27b |\n" "Bootloader Version" "$BL_VER"
-printf "| %-22s | %-27b |\n" "Active Slot" "$BL_SLOT"
-printf "| %-22s | %-27b |\n" "Kernel" "$KERNEL"
-printf "| %-22s | %-36b |\n" "Storage Used / Free" "$STORAGE_VAL"
-printf "| %-22s | %-27b |\n" "Chip SKU (Fuses)" "$CHIP_SKU"
+printf "| %-22s | %-27b |\n" "Power Mode" "$PWR_MODE"
+printf "| %-22s | %-27b |\n" "Active Slot" "$ACTIVE_SLOT ($SLOT_CONFIRM)"
+printf "| %-22s | %-27b |\n" "Internet Status" "$NET_STATUS"
+printf "| %-22s | %-27b |\n" "Active Containers" "$DOCKER_STATUS"
+printf "| %-22s | %-36b |\n" "Storage (Used/Free)" "$STORAGE_VAL"
+printf "| %-22s | %-27b |\n" "Chip SKU" "$CHIP_SKU"
 printf "| %-22s | %-27b |\n" "BIOS Version" "$BIOS_VER"
 echo -e "${CYAN}========================================================${NC}"
+
+# Logic Warnings
+if [ "$DISK_USAGE_PCT" -gt 85 ]; then
+    echo -e "${RED}!! WARNING: Low disk space (<15% free). Free up space before OTA.${NC}"
+fi
+if [ "$DOCKER_COUNT" -gt 0 ]; then
+    echo -e "${YELLOW}!! NOTE: Consider stopping Docker containers before starting OTA.${NC}"
+fi
+echo ""
