@@ -6,10 +6,10 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# 1. Extract L4T Release & Revision (Improved parsing)
+# 1. Extract L4T Release & Revision
 if [ -f /etc/nv_tegra_release ]; then
     L4T_RAW=$(head -n 1 /etc/nv_tegra_release)
-    # This pulls "R35 (release), REVISION: 4.1" and cleans it up
+    # Using sed to pull "R35 REV 4.1"
     L4T_REL=$(echo "$L4T_RAW" | sed -E 's/.*(R[0-9]+) \(release\), REVISION: ([0-9.]+).*/\1 REV \2/')
 else
     L4T_REL="Not Found"
@@ -26,10 +26,10 @@ BL_SLOT=$(echo "$BL_INFO" | grep "Active bootloader slot" | cut -d ':' -f2 | xar
 # 4. Kernel
 KERNEL=$(uname -r)
 
-# 5. Storage Logic
+# 5. Storage Logic (Fixed the quote here)
 STORAGE_INFO=$(df -h / | tail -1)
 DISK_USAGE_PCT=$(echo "$STORAGE_INFO" | awk '{print $5}' | sed 's/%//')
-DISK_FREE=$(echo "$STORAGE_INFO" | awk '{print $4}")
+DISK_FREE=$(echo "$STORAGE_INFO" | awk '{print $4}')
 
 # Color storage red if usage is > 90%
 if [ "$DISK_USAGE_PCT" -gt 90 ]; then
