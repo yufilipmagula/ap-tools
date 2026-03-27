@@ -22,7 +22,7 @@ mkdir -p "${STAGING_DIR}/dmp_config"
 mkdir -p "${STAGING_DIR}/flow_runtime"
 # 2. Perform actions
 echo "Starting backup process..."
-cp -r /etc/openvpn/clients/* "${STAGING_DIR}/openvpn_clients/" 2>/dev/null
+cp -r /etc/openvpn/client/* "${STAGING_DIR}/openvpn_clients/" 2>/dev/null
 STATUS_OVPN=$?
 cp -r /k3s/persistent/data-access/* "${STAGING_DIR}/data_access/" 2>/dev/null
 STATUS_K3S=$?
