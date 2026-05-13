@@ -20,6 +20,7 @@ mkdir -p "${STAGING_DIR}/openvpn_clients"
 mkdir -p "${STAGING_DIR}/data_access"
 mkdir -p "${STAGING_DIR}/dmp_config"
 mkdir -p "${STAGING_DIR}/flow_runtime"
+mkdir -p "${STAGING_DIR}/network/netplan"
 # 2. Perform actions
 echo "Starting backup process..."
 cp -r /etc/openvpn/client/* "${STAGING_DIR}/openvpn_clients/" 2>/dev/null
@@ -33,6 +34,10 @@ for pattern in "*.json" "*.pem" "cube_*" "*.info" "*.key" "td.ini"; do
     cp -r ${FLOW_SRC}/${pattern} "${STAGING_DIR}/flow_runtime/" 2>/dev/null
 done
 [ "$(ls -A ${STAGING_DIR}/flow_runtime 2>/dev/null)" ] && STATUS_FLOW=0 || STATUS_FLOW=1
+cp -r /etc/netplan/* "${STAGING_DIR}/network/netplan/" 2>/dev/null
+cp /etc/systemd/timesyncd.conf "${STAGING_DIR}/network/" 2>/dev/null
+cp /etc/resolv.conf "${STAGING_DIR}/network/" 2>/dev/null
+[ "$(ls -A ${STAGING_DIR}/network 2>/dev/null)" ] && STATUS_NET=0 || STATUS_NET=1
 kubectl describe configmap advanced-perception--rules-evaluator -n advanced-perception > "${STAGING_DIR}/rules_evaluator_describe.txt" 2>&1
 STATUS_KUBE=$?
 # 3. Final Compression & Encryption
@@ -62,6 +67,7 @@ printf "| %-35s | %-21b |\n" "Copy OpenVPN Clients" "$(check_status $STATUS_OVPN
 printf "| %-35s | %-21b |\n" "Copy K3s Data Access" "$(check_status $STATUS_K3S)"
 printf "| %-35s | %-21b |\n" "Copy DMP Config" "$(check_status $STATUS_DMP)"
 printf "| %-35s | %-21b |\n" "Copy FLOW Runtime (Filtered)" "$(check_status $STATUS_FLOW)"
+printf "| %-35s | %-21b |\n" "Copy Network Settings" "$(check_status $STATUS_NET)"
 printf "| %-35s | %-21b |\n" "Kubectl Describe ConfigMap" "$(check_status $STATUS_KUBE)"
 printf "| %-35s | %-21b |\n" "Encryption (AES-256)" "$(check_status $STATUS_ENC)"
 echo "--------------------------------------------------------"
