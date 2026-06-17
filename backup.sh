@@ -33,6 +33,7 @@ FLOW_SRC="/data/FLOW/runtime"
 for pattern in "*.json" "*.pem" "cube_*" "*.info" "*.key" "td.ini"; do
     cp -r ${FLOW_SRC}/${pattern} "${STAGING_DIR}/flow_runtime/" 2>/dev/null
 done
+cp "${FLOW_SRC}/block_config.ini" "${STAGING_DIR}/flow_runtime/" 2>/dev/null
 [ "$(ls -A ${STAGING_DIR}/flow_runtime 2>/dev/null)" ] && STATUS_FLOW=0 || STATUS_FLOW=1
 cp -r /etc/netplan/* "${STAGING_DIR}/network/netplan/" 2>/dev/null
 cp /etc/systemd/timesyncd.conf "${STAGING_DIR}/network/" 2>/dev/null
